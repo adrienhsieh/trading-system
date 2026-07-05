@@ -8,6 +8,26 @@ api_system = Blueprint("api_system", __name__)
 # ── 啟動時間（用來計算 uptime） ──
 _start_time = time.time()
 
+
+@api_system.route("/api/token/verify", methods=["GET"])
+def verify_token_route():
+    auth_header = request.headers.get("Authorization", None)
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return jsonify({"error": "缺少或格式錯誤的 Authorization header"}), 401
+
+    token = auth_header.split(" ")[1]
+    payload = verify_token(token)
+    if not payload:
+        return jsonify({"error": "無效或過期的 Token"}), 401
+
+    return jsonify({
+        "status": "valid",
+        "user_id": payload.get("user_id"),
+        "issued_at": payload.get("iat"),
+        "expires_at": payload.get("exp")
+    })
+
+
 # ── 健康檢查 ───────────────────────────────
 @api_system.route("/api/health", methods=["GET"])
 def health_check():

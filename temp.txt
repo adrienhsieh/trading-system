@@ -1,0 +1,24 @@
+三大核心改造（後端登入、前端攔截器、Telegram 隔離切換）的全局運作邏輯，我為您將這三件任務融合，直接生成了一張「交易系統多人版：三大模組跨端互動程式流程圖」。這張圖清晰展現了網頁前端、後端 Flask、全域主庫、個人隔離庫以及 Telegram 機器人之間的實時通訊與切換機制
+
+
+下來，您希望我們優先生成全域主庫與個人私有庫的初始化建表 SQL 與種子資料腳本，還是直接開始編寫專案中 444 個單元測試的 Conftest 模擬 Mock 防崩潰機制呢？
+ 
+
+javascript// 💡 原專案網頁（例如持倉面板 positions.html 載入時的高頻呼叫範例）：
+async function loadUserStrategyDashboard() {
+    try {
+        // 呼叫我們封裝的攔截器，不需要在網頁寫明文金鑰，Header 自動會被補上
+        const configData = await API.get('/api/get_strategy_config');
+        
+        if (configData) {
+            // 💡 關鍵作用：後端裝飾器此時已經在記憶體中解出使用者的 api_key 
+            // 並自動幫前端塞進 configData.api_key 回傳回來了！
+            console.log("當前策略持有的下單金鑰:", configData.api_key);
+            
+            // 100% 複用原單機版前端的 Lightweight Charts 或是圖表渲染程式碼
+            initTradingCharts(configData);
+        }
+    } catch (err) {
+        alert("加載戰術面板失敗: " + err.message);
+    }
+}

@@ -18,31 +18,9 @@ function toggleTechFilter(){
   }
 }
 
-async function runScanner(){
-  try {
-    const r = await api('GET', '/api/market');
-    const market = r.market || {};
-    // 渲染掃描結果...
-  } catch(e){
-    console.error('執行掃描失敗:', e);
-  }
-}
-
-
 function setStrat(s){ currentStrat=s; document.getElementById('strend').classList.toggle('active',s==='trend'); document.getElementById('sict').classList.toggle('active',s==='ict'); document.getElementById('sfundamental').classList.toggle('active',s==='fundamental'); }
 
 let scanAbort = null;
-
-async function runScan(){
-  try {
-    const r = await api('GET', '/api/market');
-    const market = r.market || {};
-    // 渲染掃描結果...
-  } catch(e){
-    console.error('執行掃描失敗:', e);
-  }
-}
-
 async function runScan(){
   const btn = document.getElementById('scan-btn');
   const stopBtn = document.getElementById('scan-stop-btn');
