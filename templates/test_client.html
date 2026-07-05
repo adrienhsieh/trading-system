@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ 交易系統多人版：前端攔截器通訊測試面板 ⚡</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1a1a1a; color: #e0e0e0; max-width: 900px; margin: 40px auto; padding: 0 20px; }
+        .card { background: #2d2d2d; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 1px solid #444; }
+        h1, h2 { color: #4fc3f7; }
+        button { background: #00bcd4; color: #fff; border: none; padding: 10px 18px; font-size: 14px; font-weight: bold; border-radius: 4px; cursor: pointer; margin-right: 10px; transition: background 0.2s; }
+        button:hover { background: #00acc1; }
+        button.danger { background: #e53935; }
+        button.danger:hover { background: #d32f2f; }
+        button.success { background: #43a047; }
+        button.success:hover { background: #388e3c; }
+        pre { background: #111; color: #69f0ae; padding: 15px; border-radius: 6px; overflow-x: auto; border: 1px solid #333; font-family: "Consolas", monospace; min-height: 80px; }
+        .status { font-weight: bold; display: inline-block; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>⚡ 多租戶交易系統：前端 Interceptor 通訊測試</h1>
+    <p>本頁面用來測試 <code>api_client.js</code> 攔截器是否能自動注入 JWT [INDEX]、並由後端裝飾器自動解析出 API Key [INDEX]。</p>
+
+    <!-- 區塊 1：目前憑證狀態 -->
+    <div class="card">
+        <h2>🔑 1. 瀏覽器憑證狀態 (LocalStorage)</h2>
+        <div id="token-status" class="status" style="color: #ffb300;">檢查中...</div>
+        <div>
+            <button class="success" onclick="simulateLogin()">🟢 模擬用戶登入 (獲取 JWT)</button>
+            <button class="danger" onclick="clearToken()">🔴 清除本地 Token (測試 401 攔截)</button>
+        </div>
+    </div>
+
+    <!-- 區塊 2：發起高頻 API 請求測試 -->
+    <div class="card">
+        <h2>📡 2. 發起通訊請求測試</h2>
+        <p>點擊下方按鈕，攔截器會自動在 Header 補上 <code>Bearer Token</code> [INDEX]：</p>
+        <button onclick="testFetchStrategy()">📊 發起請求：獲取策略戰術 JSON 檔</button>
+    </div>
+
+    <!-- 區塊 3：Console 輸出日誌 -->
+    <div class="card">
+        <h2>📋 3. 測試回應日誌 (Response Log)</h2>
+        <pre id="log-output">等待測試操作...</pre>
+    </div>
+
+    <!-- 💡 核心：直接內嵌我們在步驟二定義的 API 全域通訊攔截器 -->
+    <script>
+        const API = {
+            async request(url, options = {}) {
+                const token = localStorage.getItem('trade_sys_jwt');
+                const headers = { 'Content-Type': 'application/json', ...options.headers };
+                
+                // 攔截請求：自動注入安全鎖
+                if (token) { headers['Authorization'] = `Bearer ${token}`; }
+                const config = { ...options, headers };
+                
+                log(`[發出請求] ${options.method || 'GET'} -> ${url}`);
+                
+                try {
+                    const response = await fetch(url, config);
+                    
+                    // 攔截回應：過期或無效自動處理跳轉
+                    if (response.status === 401) {
+                        log("⚠️ [攔截器偵測異常]: JWT 憑證已過期或失效！自動觸發攔截。");
+                        localStorage.removeItem('trade_sys_jwt');
+                        updateTokenUI();
+                        alert("🔴 [攔截器提示]：您的登入憑證已失效，已被全域攔截器安全阻斷並踢回！");
+                        return null;
+                    }
+                    
+                    if (!response.ok) {
+                        const err = await response.json().catch(() => ({}));
+                        throw new Error(err.error || `HTTP 錯誤: ${response.status}`);
+                    }
+                    
+                    return await response.json();
+                } catch (error) {
+                    log(`❌ [連線失敗]: ${error.message}`);
+                    throw error;
+                }
+            },
+            async get(url) { return this.request(url, { method: 'GET' }); },
+            async post(url, body) { return this.request(url, { method: 'POST', body: JSON.stringify(body) }); }
+        };
+
+        // --- 輔助測試函數 ---
+        function log(message, jsonObject = null) {
+            const output = document.getElementById('log-output');
+            let text = `[${new Date().toLocaleTimeString()}] ${message}\n`;
+            if (jsonObject) { text += JSON.stringify(jsonObject, null, 4) + '\n'; }
+            output.innerText = text;
+        }
+
+        function updateTokenUI() {
+            const token = localStorage.getItem('trade_sys_jwt');
+            const statusEl = document.getElementById('token-status');
+            if (token) {
+                statusEl.innerText = "✅ 憑證已就緒 (已成功加密內嵌交易金鑰)";
+                statusEl.style.color = "#4af0a5";
+            } else {
+                statusEl.innerText = "❌ 尚未登入 (目前 LocalStorage 為空)";
+                statusEl.style.color = "#f44336";
+            }
+        }
+
+        // 模擬點擊登入：向您的後端發起登入
+        async function simulateLogin() {
+            try {
+                // 連接您剛剛啟動的 test_server 登入端點
+                const res = await fetch('http://127.0.0', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ "username": "trader_adrien", "password": "test1234" })
+                });
+                
+                const data = await res.json();
+                if (res.ok) {
+                    localStorage.setItem('trade_sys_jwt', data.token); // 儲存 Token [INDEX]
+                    log("🎉 登入成功！後端成功發放憑證。", data);
+                    updateTokenUI();
+                } else {
+                    log(`❌ 登入失敗: ${data.error}`);
+                }
+            } catch (err) {
+                log(`❌ 無法連線至後端伺服器: ${err.message}。請確認 test_server.py 是否在 5000 埠口執行。`);
+            }
+        }
+
+        function clearToken() {
+            localStorage.removeItem('trade_sys_jwt');
+            log("🧹 成功清空本地瀏覽器快取的 JWT Token。");
+            updateTokenUI();
+        }
+
+        // 測試發起需要驗證的 API 請求
+        async function testFetchStrategy() {
+            try {
+                // 呼叫需要驗證的後端 API 端點
+                const data = await API.get('http://127.0.0');
+                if (data) {
+                    log("🎯 [通訊大成功！] 成功透過憑證完成高頻身分驗證，後端返回的完整數據如下：", data);
+                }
+            } catch (err) {
+                // 異常已被攔截器捕獲
+            }
+        }
+
+        // 初始載入
+        document.addEventListener("DOMContentLoaded", updateTokenUI);
+    </script>
+</body>
+</html>
